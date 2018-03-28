@@ -6,3 +6,4 @@ repository = "https://github.com/stisol/Horace"
 license = "MIT"
 
 [dependencies]
+serenity = "^0.5.1"
