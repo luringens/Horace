@@ -11,7 +11,7 @@ use command_error::CommandError;
 
 struct Handler;
 
-fn role(msg: &Message) -> Result<(), CommandError> {
+fn role(msg: &Message) -> Result<String, CommandError> {
     let rolename = msg.content.trim_left_matches("!role ");
 
     if rolename.len() == 0 {
@@ -34,11 +34,50 @@ fn role(msg: &Message) -> Result<(), CommandError> {
 
     if msg.author.has_role(guildwritelock.id, role) {
         member.remove_role(role)?;
+        Ok("Role removed!".to_owned())
     } else {
         member.add_role(role)?;
+        Ok("Role added!".to_owned())
     }
+}
 
-    Ok(())
+fn roles(msg: &Message) -> Result<String, CommandError> {
+    let guild = msg.guild().ok_or("Could not get guild.".to_owned())?;
+
+    let mut roles: Vec<String> = guild
+        .read()
+        .roles
+        .iter()
+        .map(|(_, role)| role.name.clone())
+        .filter(|role| role != "@everyone")
+        .collect();
+
+    roles.sort();
+
+    if roles.len() > 1 {
+        let mut v1 = Vec::with_capacity(roles.len() / 2);
+        let mut v2 = Vec::with_capacity(roles.len() / 2);
+        for (i, s) in roles.into_iter().enumerate() {
+            if i % 2 == 0 {
+                v1.push(s);
+            } else {
+                v2.push(format!("{}\n", s));
+            }            
+        }
+        let colwidth = v1.iter().map(|s| s.len()).max().expect("Failed to find max");
+        v1 = v1.into_iter().map(|s| format!("{:<width$}  |  ", s, width = colwidth)).collect();
+
+        Ok(format!("```\n{}\n```", v1
+            .into_iter()
+            .zip(v2)
+            .map(|(a, b)| format!("{}{}", a, b))
+            .fold(String::new(), |s, n| format!("{}{}", s, n))))
+    }
+    else {
+        Ok(format!("```\n{}\n```", roles
+            .into_iter()
+            .fold(String::new(), |s, n| format!("{}\n{}", s, n))))
+    }
 }
 
 impl EventHandler for Handler {
@@ -49,7 +88,16 @@ impl EventHandler for Handler {
             }
         } else if msg.content.starts_with("!role ") {
             let message = match role(&msg) {
-                Ok(()) => "Role added!".to_owned(),
+                Ok(r) => r,
+                Err(e) => format!("{}", e),
+            };
+
+            if let Err(why) = msg.channel_id.say(message) {
+                println!("Error sending message: {:?}", why);
+            }
+        } else if msg.content == "!roles" {
+            let message = match roles(&msg) {
+                Ok(r) => r,
                 Err(e) => format!("{}", e),
             };
 
