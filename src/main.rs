@@ -1,122 +1,13 @@
 extern crate serenity;
 
 mod command_error;
+mod event_handler;
+mod roles;
 
 use serenity::prelude::*;
-use serenity::model::channel::Message;
-use serenity::model::gateway::Ready;
 use std::env;
-use std::fmt::Display;
 
-use command_error::CommandError;
-
-fn reply_or_print<T: Display>(msg: &Message, text: T) {
-    if let Err(why) = msg.channel_id.say(format!("{}", text)) {
-        println!("Error sending message: {:?}", why);
-    }
-}
-
-fn role(msg: &Message) -> Result<String, CommandError> {
-    let rolename = msg.content.trim_left_matches("!role ");
-
-    if rolename.len() == 0 {
-        return Err(CommandError::Generic(
-            "Please enter a role name.".to_owned(),
-        ));
-    }
-
-    let guild = msg.guild().ok_or("Could not get guild.".to_owned())?;
-    let guildwritelock = guild.read();
-
-    let &(_, role) = &(*guildwritelock)
-        .roles
-        .iter()
-        .find(|&(_, role)| role.name == rolename)
-        .ok_or("Could not find role.".to_owned())?;
-
-    let mut member = msg.member()
-        .ok_or("Could not get guild member from user.".to_owned())?;
-
-    if msg.author.has_role(guildwritelock.id, role) {
-        member.remove_role(role)?;
-        Ok("Role removed!".to_owned())
-    } else {
-        member.add_role(role)?;
-        Ok("Role added!".to_owned())
-    }
-}
-
-fn roles(msg: &Message) -> Result<String, CommandError> {
-    let guild = msg.guild().ok_or("Could not get guild.".to_owned())?;
-
-    let mut roles: Vec<String> = guild
-        .read()
-        .roles
-        .iter()
-        .map(|(_, role)| role.name.clone())
-        .filter(|role| role != "@everyone")
-        .collect();
-
-    roles.sort();
-
-    if roles.len() > 1 {
-        let mut v1 = Vec::with_capacity(roles.len() / 2);
-        let mut v2 = Vec::with_capacity(roles.len() / 2);
-        for (i, s) in roles.into_iter().enumerate() {
-            if i % 2 == 0 {
-                v1.push(s);
-            } else {
-                v2.push(format!("{}\n", s));
-            }
-        }
-        let colwidth = v1.iter().map(|s| s.len()).max().expect("Failed to find max");
-        v1 = v1.into_iter().map(|s| format!("{:<width$}  |  ", s, width = colwidth)).collect();
-
-        Ok(format!("```\n{}\n```", v1
-            .into_iter()
-            .zip(v2)
-            .map(|(a, b)| format!("{}{}", a, b))
-            .fold(String::new(), |s, n| format!("{}{}", s, n))))
-    }
-    else {
-        Ok(format!("```\n{}\n```", roles
-            .into_iter()
-            .fold(String::new(), |s, n| format!("{}\n{}", s, n))))
-    }
-}
-
-struct Handler;
-
-impl EventHandler for Handler {
-    fn message(&self, _: Context, msg: Message) {
-        match msg.content.split_whitespace().nth(1).unwrap_or("") {
-            "!ping"  => {
-                reply_or_print(&msg, "Pong!");
-            }
-            "!role" | "!rank" => {
-                let message = match role(&msg) {
-                    Ok(r) => r,
-                    Err(e) => format!("{}", e),
-                };
-
-                reply_or_print(&msg, &message);
-            }
-            "!roles" | "!ranks" => {
-                let message = match roles(&msg) {
-                    Ok(r) => r,
-                    Err(e) => format!("{}", e),
-                };
-
-                reply_or_print(&msg, &message);
-            }
-            _ => {}
-        }
-    }
-
-    fn ready(&self, _: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
-    }
-}
+use event_handler::*;
 
 fn main() {
     // Configure the client with your Discord bot token in the environment.
