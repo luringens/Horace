@@ -6,10 +6,15 @@ use serenity::prelude::*;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use std::env;
+use std::fmt::Display;
 
 use command_error::CommandError;
 
-struct Handler;
+fn reply_or_print<T: Display>(msg: &Message, text: T) {
+    if let Err(why) = msg.channel_id.say(format!("{}", text)) {
+        println!("Error sending message: {:?}", why);
+    }
+}
 
 fn role(msg: &Message) -> Result<String, CommandError> {
     let rolename = msg.content.trim_left_matches("!role ");
@@ -62,7 +67,7 @@ fn roles(msg: &Message) -> Result<String, CommandError> {
                 v1.push(s);
             } else {
                 v2.push(format!("{}\n", s));
-            }            
+            }
         }
         let colwidth = v1.iter().map(|s| s.len()).max().expect("Failed to find max");
         v1 = v1.into_iter().map(|s| format!("{:<width$}  |  ", s, width = colwidth)).collect();
@@ -80,30 +85,31 @@ fn roles(msg: &Message) -> Result<String, CommandError> {
     }
 }
 
+struct Handler;
+
 impl EventHandler for Handler {
     fn message(&self, _: Context, msg: Message) {
-        if msg.content == "!ping" {
-            if let Err(why) = msg.channel_id.say("Pong!") {
-                println!("Error sending message: {:?}", why);
+        match msg.content.split_whitespace().nth(1).unwrap_or("") {
+            "!ping"  => {
+                reply_or_print(&msg, "Pong!");
             }
-        } else if msg.content.starts_with("!role ") {
-            let message = match role(&msg) {
-                Ok(r) => r,
-                Err(e) => format!("{}", e),
-            };
+            "!role" | "!rank" => {
+                let message = match role(&msg) {
+                    Ok(r) => r,
+                    Err(e) => format!("{}", e),
+                };
 
-            if let Err(why) = msg.channel_id.say(message) {
-                println!("Error sending message: {:?}", why);
+                reply_or_print(&msg, &message);
             }
-        } else if msg.content == "!roles" {
-            let message = match roles(&msg) {
-                Ok(r) => r,
-                Err(e) => format!("{}", e),
-            };
+            "!roles" | "!ranks" => {
+                let message = match roles(&msg) {
+                    Ok(r) => r,
+                    Err(e) => format!("{}", e),
+                };
 
-            if let Err(why) = msg.channel_id.say(message) {
-                println!("Error sending message: {:?}", why);
+                reply_or_print(&msg, &message);
             }
+            _ => {}
         }
     }
 
