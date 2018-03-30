@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Stian Soltvedt <soltvedt.stian@gmail.com>"]
 repository = "https://github.com/stisol/Horace"
 license = "MIT"
+readme = "README.md"
 
 [dependencies]
 serenity = "^0.5.1"
