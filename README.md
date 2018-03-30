@@ -6,10 +6,10 @@ An attempt to replicate the functionality of other Discord bots in a way that be
 
 - [ ] Welcome page
 - [ ] Happenings page
-- [ ] Roles
+- [x] Roles
     - [x] Adding and removing roles
     - [x] Listing roles
-    - [ ] Only certain roles joinable
+    - [x] Only certain roles joinable
 - [ ] Custom commands
     - [ ] Trigger on keywords
     - [ ] Restrict to channels

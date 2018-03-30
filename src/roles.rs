@@ -1,6 +1,30 @@
 use serenity::model::channel::Message;
+use serenity::model::guild::{Guild, Role};
 
 use command_error::*;
+
+fn get_public_roles(guild: &Guild) -> Vec<&Role> {
+    let mut roles: Vec<&Role> = guild.roles
+        .iter()
+        .map(|(_, role)| role)
+        .filter(|role| role.name != "@everyone")
+        .collect();
+
+    roles.sort_unstable_by(|r1, r2| r2.position.cmp(&r1.position));
+
+    let mut result: Vec<&Role> = vec![];
+    let mut skipping = true;
+    for role in roles {
+        if !skipping {
+            result.push(role);
+        }
+        else if role.name == "vvv public vvv" {
+            skipping = false;
+        }
+    }
+
+    result
+}
 
 pub fn role(msg: &Message) -> Result<String, CommandError> {
     let rolename = msg.content.trim_left_matches("!role ");
@@ -34,48 +58,39 @@ pub fn role(msg: &Message) -> Result<String, CommandError> {
 
 pub fn roles(msg: &Message) -> Result<String, CommandError> {
     let guild = msg.guild().ok_or("Could not get guild.".to_owned())?;
-
-    let mut roles: Vec<String> = guild
-        .read()
-        .roles
+    let guild = guild.read();
+    
+    let mut roles: Vec<&String> = get_public_roles(&guild)
         .iter()
-        .map(|(_, role)| role.name.clone())
-        .filter(|role| role != "@everyone")
+        .map(|role| &role.name)
         .collect();
-
+    
     roles.sort();
 
-    if roles.len() > 1 {
-        let mut v1 = Vec::with_capacity(roles.len() / 2);
-        let mut v2 = Vec::with_capacity(roles.len() / 2);
+    if roles.len() == 0 {
+        Ok("No public roles.".to_owned())
+    } else {
+        let mut col1 = Vec::with_capacity(roles.len() / 2);
+        let mut col2 = Vec::with_capacity(roles.len() / 2);
         for (i, s) in roles.into_iter().enumerate() {
             if i % 2 == 0 {
-                v1.push(s);
+                col1.push(s);
             } else {
-                v2.push(format!("{}\n", s));
+                col2.push(format!("{}\n", s));
             }
         }
-        let colwidth = v1.iter()
+        let colwidth = col1.iter()
             .map(|s| s.len())
             .max()
-            .expect("Failed to find max");
-        v1 = v1.into_iter()
-            .map(|s| format!("{:<width$}  |  ", s, width = colwidth))
-            .collect();
+            .unwrap_or(5);
 
-        Ok(format!(
-            "```\n{}\n```",
-            v1.into_iter()
-                .zip(v2)
-                .map(|(a, b)| format!("{}{}", a, b))
-                .fold(String::new(), |s, n| format!("{}{}", s, n))
-        ))
-    } else {
-        Ok(format!(
-            "```\n{}\n```",
-            roles
-                .into_iter()
-                .fold(String::new(), |s, n| format!("{}\n{}", s, n))
-        ))
+        let mut result = String::new();
+        for i in 0..col1.len() {
+            let left = &col1[i];
+            let right = if i < col2.len() { &col2[i] } else { "" };
+            result.push_str(&format!("{:<width$}  |  {}", left, right, width = colwidth));
+        }
+
+        Ok(format!("```\n{}\n```", result))
     }
 }

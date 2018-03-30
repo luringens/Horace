@@ -10,7 +10,7 @@ pub struct Handler;
 
 impl EventHandler for Handler {
     fn message(&self, _: Context, msg: Message) {
-        match msg.content.split_whitespace().nth(1).unwrap_or("") {
+        match msg.content.split_whitespace().nth(0).unwrap_or("") {
             "!ping" => {
                 reply_or_print(&msg, "Pong!");
             }
