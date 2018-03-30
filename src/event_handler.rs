@@ -5,6 +5,7 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 
 use roles::*;
+use command_error::CommandError;
 
 pub struct Handler;
 
@@ -15,20 +16,10 @@ impl EventHandler for Handler {
                 reply_or_print(&msg, "Pong!");
             }
             "!role" | "!rank" => {
-                let message = match role(&msg) {
-                    Ok(r) => r,
-                    Err(e) => format!("{}", e),
-                };
-
-                reply_or_print(&msg, &message);
+                reply_or_print_result(&msg, role(&msg));
             }
             "!roles" | "!ranks" => {
-                let message = match roles(&msg) {
-                    Ok(r) => r,
-                    Err(e) => format!("{}", e),
-                };
-
-                reply_or_print(&msg, &message);
+                reply_or_print_result(&msg, roles(&msg));
             }
             _ => {}
         }
@@ -37,6 +28,15 @@ impl EventHandler for Handler {
     fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
     }
+}
+
+fn reply_or_print_result(msg: &Message, result: Result<String, CommandError>) {
+    let message = match result {
+        Ok(r) => r,
+        Err(e) => format!("{}", e),
+    };
+
+    reply_or_print(&msg, &message);
 }
 
 fn reply_or_print<T: Display>(msg: &Message, text: T) {
