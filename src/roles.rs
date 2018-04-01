@@ -30,10 +30,13 @@ fn get_public_roles(guild: &Guild) -> Vec<&Role> {
 /// [get_public_roles](get_public_roles).
 pub fn role(msg: &Message) -> Result<String, CommandError> {
     let rolename: String = msg.content
-        .split_whitespace()
+        .chars()
+        .skip_while(|c| !c.is_whitespace())
         .skip(1)
         .collect::<String>()
         .to_lowercase();
+
+    println!("{}", rolename);
 
     if rolename.len() == 0 {
         return Err(CommandError::Generic(
