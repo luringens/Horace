@@ -5,12 +5,17 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 
 use roles::*;
+use statistics::*;
 use command_error::CommandError;
 
 pub struct Handler;
 
 impl EventHandler for Handler {
     fn message(&self, _: Context, msg: Message) {
+        if let Err(e) = save_message_statistic(&msg) {
+            println!("An error occurred while saving stats: {}", e);
+        }
+
         match msg.content.split_whitespace().nth(0).unwrap_or("") {
             "!ping" => {
                 reply_or_print(&msg, "Pong!");
@@ -20,6 +25,9 @@ impl EventHandler for Handler {
             }
             "!roles" | "!ranks" => {
                 reply_or_print_result(&msg, roles(&msg));
+            }
+            "!stats" => {
+                reply_or_print_result(&msg, get_message_statistics(&msg));
             }
             _ => {}
         }

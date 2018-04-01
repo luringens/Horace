@@ -8,3 +8,4 @@ readme = "README.md"
 
 [dependencies]
 serenity = "^0.5.1"
+postgres = "^0.15.2"
