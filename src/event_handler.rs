@@ -4,6 +4,7 @@ use serenity::prelude::*;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 
+use remindme::*;
 use roles::*;
 use statistics::*;
 use command_error::CommandError;
@@ -28,6 +29,9 @@ impl EventHandler for Handler {
             }
             "!stats" => {
                 reply_or_print_result(&msg, get_message_statistics(&msg));
+            }
+            "!remindme" => {
+                reply_or_print_result(&msg, remindme(&msg));
             }
             _ => {}
         }

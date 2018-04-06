@@ -1,10 +1,12 @@
 extern crate postgres;
 extern crate serenity;
+extern crate chrono;
 
 mod command_error;
 mod event_handler;
 mod roles;
 mod statistics;
+mod remindme;
 
 use serenity::prelude::*;
 use std::env;
