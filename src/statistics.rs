@@ -1,6 +1,5 @@
 use postgres::{Connection, TlsMode};
 use serenity::model::channel::Message;
-use serenity::model::id::UserId;
 use env;
 
 use std::str::FromStr;
@@ -19,16 +18,17 @@ pub fn save_message_statistic(msg: &Message) -> Result<(), CommandError> {
 
     let guild_id = format!("{}", msg.guild_id().unwrap().0);
     let user_id = format!("{}", msg.author.id.0);
+    let date = msg.timestamp.naive_utc().date();
     let messages = 1;
     let words = msg.content.split_whitespace().count() as i32;
 
     conn.execute(
-        "INSERT INTO statistics (guild_id, user_id, messages, words)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT(guild_id, user_id) DO UPDATE SET
-            messages = statistics.messages + $3,
-            words = statistics.words + $4",
-        &[&guild_id, &user_id, &messages, &words],
+        "INSERT INTO statistics (guild_id, user_id, date, messages, words)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT(guild_id, user_id, date) DO UPDATE SET
+            messages = statistics.messages + $4,
+            words = statistics.words + $5",
+        &[&guild_id, &user_id, &date, &messages, &words],
     )?;
 
     Ok(())
@@ -37,8 +37,18 @@ pub fn save_message_statistic(msg: &Message) -> Result<(), CommandError> {
 pub fn get_message_statistics(msg: &Message) -> Result<String, CommandError> {
     // Don't bother with PMs.
     if msg.guild().is_none() {
-        return Ok("No statistics in PMs.".to_owned())
+        return Ok("No statistics in PMs.".to_owned());
     }
+
+    // Check the number of days to get stats for.
+    // Default to 1 week.
+    static DEFAULT_DAYS: i32 = 7;
+    let days = msg.content
+        .split_whitespace()
+        .nth(1)
+        .map(|a| i32::from_str(a))
+        .unwrap_or(Ok(DEFAULT_DAYS))
+        .unwrap_or(DEFAULT_DAYS);
 
     let guild = msg.guild().unwrap();
     let guild = guild.read();
@@ -48,36 +58,57 @@ pub fn get_message_statistics(msg: &Message) -> Result<String, CommandError> {
 
     let conn = Connection::connect(conn_string, TlsMode::None)?;
 
-    let mut results = vec![];
-    for row in &conn.query(
-        "SELECT user_id, messages, words FROM statistics WHERE guild_id = $1",
-        &[&guild_id],
-    )? {
-        let user_id: String = row.get(0);
-        
-        let user_id = u64::from_str(&user_id).map(|a| UserId::from(a));
-        if user_id.is_err() {
-            continue;
-        }
+    let rows = &conn.query(
+        "SELECT user_id, SUM(messages) as messages, SUM(words) as words FROM statistics
+WHERE guild_id = $1 AND date > current_date - CAST ($2 AS INTEGER)
+GROUP BY user_id
+ORDER BY words DESC",
+        &[&guild_id, &days],
+    )?;
 
-        let user = guild.member(user_id.unwrap());
-        if user.is_err() {
-            continue;
-        }
-        let user = user.unwrap();
-        
-        let messages: i32 = row.get(1);
-        let chars: i32 = row.get(2);
-        results.push((user.display_name().into_owned(),
-            messages,
-            chars
-        ));
+    let mut results = vec![];
+    for row in rows.into_iter().take(10) {
+        let user_id: String = row.get(0);
+        let user_id = match u64::from_str(&user_id) {
+            Ok(id) => id,
+            Err(_) => {
+                println!("Failed to parse id {} to int.", user_id);
+                continue
+            }
+        };
+
+        let user = match guild.member(user_id) {
+            Ok(user) => user,
+            Err(_) => {
+                println!("Failed to look up member from id {}.", user_id);
+                continue
+            }
+        };
+
+        let messages: i64 = row.get(1);
+        let chars: i64 = row.get(2);
+        results.push((user.display_name().into_owned(), messages, chars));
     }
     results.sort_by(|a, b| b.2.cmp(&a.2));
 
-    let result = results.into_iter()
-        .map(|a| format!("{}: {} messages, {} words.", a.0, a.1, a.2))
+    let name_width = results.iter().map(|&(ref n, ..)| n.len()).max().unwrap_or(5);
+    let messages_width = results.iter().map(|&(_, n, _)| digits(n)).max().unwrap_or(5);
+    let chars_width = results.iter().map(|&(_, _, n)| digits(n)).max().unwrap_or(5);
+
+    let result = results
+        .into_iter()
+        .map(|a| format!("{:<nw$} | {:>mw$} messages | {:>cw$} words.", a.0, a.1, a.2, nw = name_width, mw = messages_width, cw = chars_width))
         .fold(String::new(), |a, b| format!("{}\n{}", a, b));
 
     Ok(format!("Statistics:\n```\n{}\n```", result))
+}
+
+fn digits(number: i64) -> usize {
+    let mut number = number;
+    let mut digits = 0;
+    while number != 0 {
+        number /= 10;
+        digits += 1;
+    }
+    return digits;
 }

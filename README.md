@@ -6,6 +6,7 @@ An attempt to replicate the functionality of other Discord bots in a way that be
 
 - [ ] Welcome page
 - [ ] Happenings page
+- [x] Statistics
 - [x] Roles
     - [x] Adding and removing roles
     - [x] Listing roles
