@@ -6,17 +6,18 @@ use std::str::FromStr;
 
 use command_error::CommandError;
 
+/// Adds a message to the statistics database.
 pub fn save_message_statistic(msg: &Message) -> Result<(), CommandError> {
-    // Don't bother with PMs.
-    if msg.guild().is_none() {
-        return Ok(())
-    }
+    // Don't reply to PM's as the command is only valid for guilds.
+    let guild_id = match msg.guild_id() {
+        Some(id) => id.0,
+        None => return Err(CommandError::Generic("No statistics in PMs.".to_owned())),
+    };
 
     let conn_string = env::var("POSTGRES_CONNSTRING").expect("Expected a token in the environment");
-
     let conn = Connection::connect(conn_string, TlsMode::None)?;
 
-    let guild_id = format!("{}", msg.guild_id().unwrap().0);
+    let guild_id = format!("{}", guild_id);
     let user_id = format!("{}", msg.author.id.0);
     let date = msg.timestamp.naive_utc().date();
     let messages = 1;
@@ -34,12 +35,9 @@ pub fn save_message_statistic(msg: &Message) -> Result<(), CommandError> {
     Ok(())
 }
 
+/// Get the top ten most active users by word count.
+/// Default number of days of activity to look at is 7.
 pub fn get_message_statistics(msg: &Message) -> Result<String, CommandError> {
-    // Don't bother with PMs.
-    if msg.guild().is_none() {
-        return Ok("No statistics in PMs.".to_owned());
-    }
-
     // Check the number of days to get stats for.
     // Default to 1 week.
     static DEFAULT_DAYS: i32 = 7;
@@ -50,30 +48,33 @@ pub fn get_message_statistics(msg: &Message) -> Result<String, CommandError> {
         .unwrap_or(Ok(DEFAULT_DAYS))
         .unwrap_or(DEFAULT_DAYS);
 
-    let guild = msg.guild().unwrap();
+    // Don't reply to PM's as the command is only valid for guilds.
+    let guild = match msg.guild() {
+        Some(guild) => guild,
+        None => return Err(CommandError::Generic("No statistics in PMs.".to_owned())),
+    };
     let guild = guild.read();
-    let guild_id = format!("{}", msg.guild_id().unwrap().0);
+    let guild_id = format!("{}", guild.id.0);
 
     let conn_string = env::var("POSTGRES_CONNSTRING").expect("Expected a token in the environment");
-
     let conn = Connection::connect(conn_string, TlsMode::None)?;
-
     let rows = &conn.query(
         "SELECT user_id, SUM(messages) as messages, SUM(words) as words FROM statistics
 WHERE guild_id = $1 AND date > current_date - CAST ($2 AS INTEGER)
 GROUP BY user_id
-ORDER BY words DESC",
+ORDER BY words DESC
+fetch first 10 rows only",
         &[&guild_id, &days],
     )?;
 
     let mut results = vec![];
-    for row in rows.into_iter().take(10) {
+    for row in rows.into_iter() {
         let user_id: String = row.get(0);
         let user_id = match u64::from_str(&user_id) {
             Ok(id) => id,
             Err(_) => {
                 println!("Failed to parse id {} to int.", user_id);
-                continue
+                continue;
             }
         };
 
@@ -81,7 +82,7 @@ ORDER BY words DESC",
             Ok(user) => user,
             Err(_) => {
                 println!("Failed to look up member from id {}.", user_id);
-                continue
+                continue;
             }
         };
 
@@ -91,13 +92,35 @@ ORDER BY words DESC",
     }
     results.sort_by(|a, b| b.2.cmp(&a.2));
 
-    let name_width = results.iter().map(|&(ref n, ..)| n.len()).max().unwrap_or(5);
-    let messages_width = results.iter().map(|&(_, n, _)| digits(n)).max().unwrap_or(5);
-    let chars_width = results.iter().map(|&(_, _, n)| digits(n)).max().unwrap_or(5);
+    let name_width = results
+        .iter()
+        .map(|&(ref n, ..)| n.len())
+        .max()
+        .unwrap_or(5);
+    let messages_width = results
+        .iter()
+        .map(|&(_, n, _)| digits(n))
+        .max()
+        .unwrap_or(5);
+    let chars_width = results
+        .iter()
+        .map(|&(_, _, n)| digits(n))
+        .max()
+        .unwrap_or(5);
 
     let result = results
         .into_iter()
-        .map(|a| format!("{:<nw$} | {:>mw$} messages | {:>cw$} words.", a.0, a.1, a.2, nw = name_width, mw = messages_width, cw = chars_width))
+        .map(|a| {
+            format!(
+                "{:<nw$} | {:>mw$} messages | {:>cw$} words.",
+                a.0,
+                a.1,
+                a.2,
+                nw = name_width,
+                mw = messages_width,
+                cw = chars_width
+            )
+        })
         .fold(String::new(), |a, b| format!("{}\n{}", a, b));
 
     Ok(format!("Statistics:\n```\n{}\n```", result))
