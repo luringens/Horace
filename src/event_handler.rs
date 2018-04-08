@@ -11,6 +11,15 @@ use command_error::CommandError;
 
 pub struct Handler;
 
+static HELP_TEXT: &str = "Usage:
+`!ping`: Bot responds with \"Pong!\".
+`!help`: Print this message.
+`!role`: Join or leave a public role.
+`!roles`: Print a list of roles you can join.
+`!stats x`: List the 5 most active users for the last `x` days (defaults to 7).
+`!remindme x scale message`: Makes the bot send you a PM containing the message after \
+x minutes/hours/days/weeks.";
+
 impl EventHandler for Handler {
     fn message(&self, _: Context, msg: Message) {
         if let Err(e) = save_message_statistic(&msg) {
@@ -21,10 +30,13 @@ impl EventHandler for Handler {
             "!ping" => {
                 reply_or_print(&msg, "Pong!");
             }
+            "!help" => {
+                reply_or_print(&msg, HELP_TEXT);
+            }
             "!role" | "!rank" => {
                 reply_or_print_result(&msg, role(&msg));
             }
-            "!roles" | "!ranks" => {
+            "!roles" | "!publicroles" | "!ranks" => {
                 reply_or_print_result(&msg, roles(&msg));
             }
             "!stats" => {
