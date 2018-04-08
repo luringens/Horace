@@ -10,8 +10,8 @@ use env;
 
 use command_error::*;
 
-static USAGE: &str = "Usage: `!remindme x scale`, where x is a number, \
-                      and scale is one of minutes, hours, days or weeks.";
+static USAGE: &str = "Usage: `!remindme x scale`, where `x` is a number, \
+                      and scale is `minutes`, `hours`, `days` or `weeks`.";
 
 /// Stores a reminder in the database.
 pub fn remindme(msg: &Message) -> Result<String, CommandError> {
@@ -19,13 +19,10 @@ pub fn remindme(msg: &Message) -> Result<String, CommandError> {
 
     // Extract the message from the command.
     let mut message = String::new();
-    msg.content
-        .split_whitespace()
-        .skip(3)
-        .for_each(|s| {
-            message.push_str(s);
-            message.push_str(" ");
-        });
+    msg.content.split_whitespace().skip(3).for_each(|s| {
+        message.push_str(s);
+        message.push_str(" ");
+    });
     if message.bytes().len() > 150 {
         return Err(CommandError::Generic(
             "Message can only be 150 (ascii) chars long.".to_owned(),

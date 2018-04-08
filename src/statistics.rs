@@ -11,7 +11,7 @@ pub fn save_message_statistic(msg: &Message) -> Result<(), CommandError> {
     // Don't reply to PM's as the command is only valid for guilds.
     let guild_id = match msg.guild_id() {
         Some(id) => id.0,
-        None => return Err(CommandError::Generic("No statistics in PMs.".to_owned())),
+        None => return Ok(()),
     };
 
     let conn_string = env::var("POSTGRES_CONNSTRING").expect("Expected a token in the environment");
@@ -123,7 +123,11 @@ fetch first 10 rows only",
         })
         .fold(String::new(), |a, b| format!("{}\n{}", a, b));
 
-    Ok(format!("Statistics:\n```\n{}\n```", result))
+    Ok(format!(
+        "Statistics for the top 10 most active users the last {} days:\
+         \n```\n{}\n```",
+        days, result
+    ))
 }
 
 fn digits(number: i64) -> usize {

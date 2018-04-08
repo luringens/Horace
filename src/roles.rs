@@ -36,8 +36,6 @@ pub fn role(msg: &Message) -> Result<String, CommandError> {
         .collect::<String>()
         .to_lowercase();
 
-    println!("{}", rolename);
-
     if rolename.len() == 0 {
         return Err(CommandError::Generic(
             "Please enter a role name.".to_owned(),
