@@ -19,9 +19,14 @@ An attempt to replicate the functionality of other Discord bots in a way that be
 - [ ] Kicking, banning
 - [ ] Silent place
 - [ ] Web configuration?
+- [ ] Connection pooling to speed up database access
+- [ ] Proper logging
 
-## Build instructions
+## How to run
+
+First, set `DISCORD_TOKEN` and `POSTGRES_CONNSTRING` in your environment. If the latter is ommitted,
+horace will run while complain constantly. Then:
 
 ```sh
-cargo build --release
+`cargo run --release`.
 ```
