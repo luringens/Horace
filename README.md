@@ -11,7 +11,7 @@ An attempt to replicate the functionality of other Discord bots in a way that be
     - [x] Adding and removing roles
     - [x] Listing roles
     - [x] Only certain roles joinable
-- [ ] Reminders
+- [x] Reminders
 - [ ] Custom commands
     - [ ] Trigger on keywords
     - [ ] Restrict to channels

@@ -5,4 +5,11 @@ CREATE TABLE statistics (
     messages INTEGER NOT NULL,
     words INTEGER NOT NULL,
     PRIMARY KEY (guild_id, user_id, date)
-)
+);
+
+CREATE TABLE reminders (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(20) NOT NULL,
+    date TIMESTAMP NOT NULL,
+    message VARCHAR(150)
+);

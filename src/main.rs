@@ -1,6 +1,6 @@
+extern crate chrono;
 extern crate postgres;
 extern crate serenity;
-extern crate chrono;
 
 mod command_error;
 mod event_handler;
@@ -8,9 +8,10 @@ mod roles;
 mod statistics;
 mod remindme;
 
+use std::{env, thread};
 use serenity::prelude::*;
-use std::env;
 
+use remindme::watch_for_reminders;
 use event_handler::*;
 
 fn main() {
@@ -21,6 +22,11 @@ fn main() {
     // automatically prepend your bot token with "Bot ", which is a requirement
     // by Discord for bot users.
     let mut client = Client::new(&token, Handler).expect("Err creating client");
+
+    // Run a background thread to watch for !remindme triggers
+    thread::spawn(move || {
+        watch_for_reminders();
+    });
 
     // Finally, start a single shard, and start listening to events.
     //
