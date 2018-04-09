@@ -46,7 +46,7 @@ pub fn remindme(msg: &Message) -> Result<String, CommandError> {
         &[&user_id, &date, &message],
     )?;
 
-    Ok(format!("Reminder set for {}", date))
+    Ok(format!("Reminder set for {} UTC.", date.format("%Y-%m-%d %H:%M:%S")))
 }
 
 /// Attempts to parse the interval part from a `!remindme` command.
