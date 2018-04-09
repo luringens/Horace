@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::error::Error;
 
 use serenity::prelude::*;
 use serenity::model::channel::Message;
@@ -23,7 +24,12 @@ x minutes/hours/days/weeks.";
 impl EventHandler for Handler {
     fn message(&self, _: Context, msg: Message) {
         if let Err(e) = save_message_statistic(&msg) {
-            println!("An error occurred while saving stats: {}", e);
+            warn!("An error occurred while saving stats: {}", e.description());
+        }
+
+        // Early return to avoid lots of strong comparisons.
+        if !msg.content.starts_with("!") {
+            return;
         }
 
         match msg.content.split_whitespace().nth(0).unwrap_or("") {
@@ -55,16 +61,14 @@ impl EventHandler for Handler {
 }
 
 fn reply_or_print_result(msg: &Message, result: Result<String, CommandError>) {
-    let message = match result {
-        Ok(r) => r,
-        Err(e) => format!("{}", e),
-    };
-
-    reply_or_print(&msg, &message);
+    match result {
+        Ok(r) => reply_or_print(&msg, &r),
+        Err(e) => error!("{:?}", e),
+    }
 }
 
 fn reply_or_print<T: Display>(msg: &Message, text: T) {
     if let Err(why) = msg.channel_id.say(format!("{}", text)) {
-        println!("Error sending message: {:?}", why);
+        error!("Error sending message: {:?}", why);
     }
 }

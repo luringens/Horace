@@ -10,3 +10,5 @@ readme = "README.md"
 serenity = "^0.5.1"
 postgres = { version = "^0.15.2", features = ["with-chrono"] }
 chrono = "^0.4.1"
+log = "^0.4.1"
+env_logger = "0.5.6"

@@ -17,7 +17,7 @@ fn get_public_roles(guild: &Guild) -> Vec<&Role> {
 
     roles.sort_unstable_by(|r1, r2| r2.position.cmp(&r1.position));
 
-    // Skip until
+    // Skip until `vvv public vvv`
     roles
         .into_iter()
         .skip_while(|r| r.name != "vvv public vvv")
@@ -36,28 +36,32 @@ pub fn role(msg: &Message) -> Result<String, CommandError> {
         .collect::<String>()
         .to_lowercase();
 
-    if rolename.len() == 0 {
-        return Err(CommandError::Generic(
-            "Please enter a role name.".to_owned(),
-        ));
+    if rolename.is_empty() {
+        return Ok("Please enter a role name.".to_owned());
     }
 
-    let guild = msg.guild().ok_or("Could not get guild.".to_owned())?;
+    let guild = match msg.guild() {
+        Some(g) => g,
+        None => return Ok("Can't use roles in PMs.".to_owned()),
+    };
     let guildwritelock = guild.read();
 
-    let role = get_public_roles(&guildwritelock);
-    let role = role.iter()
-        .find(|r| r.name.to_lowercase() == rolename)
-        .ok_or("Could not find role.".to_owned())?;
+    let role = get_public_roles(&guildwritelock)
+        .into_iter()
+        .find(|r| r.name.to_lowercase() == rolename);
+    let role = match role {
+        Some(r) => r,
+        None => return Ok("Could not find role.".to_owned()),
+    };
 
     let mut member = msg.member()
-        .ok_or("Could not get guild member from user.".to_owned())?;
-
-    if msg.author.has_role(guildwritelock.id, *role) {
-        member.remove_role(*role)?;
+        .ok_or(format!("Could not get member from user {}", msg.author.id))?;
+    
+    if msg.author.has_role(guildwritelock.id, role) {
+        member.remove_role(role)?;
         Ok("Role removed!".to_owned())
     } else {
-        member.add_role(*role)?;
+        member.add_role(role)?;
         Ok("Role added!".to_owned())
     }
 }
@@ -65,7 +69,10 @@ pub fn role(msg: &Message) -> Result<String, CommandError> {
 /// Formats all roles from [get_public_roles](get_public_roles)
 /// in a code block, two columns wide.
 pub fn roles(msg: &Message) -> Result<String, CommandError> {
-    let guild = msg.guild().ok_or("Could not get guild.".to_owned())?;
+    let guild = match msg.guild() {
+        Some(g) => g,
+        None => return Ok("Can't use roles in PMs.".to_owned()),
+    };
     let guild = guild.read();
 
     let mut roles: Vec<&String> = get_public_roles(&guild)

@@ -14,7 +14,7 @@ pub fn save_message_statistic(msg: &Message) -> Result<(), CommandError> {
         None => return Ok(()),
     };
 
-    let conn_string = env::var("POSTGRES_CONNSTRING").expect("Expected a token in the environment");
+    let conn_string = env::var("POSTGRES_CONNSTRING")?;
     let conn = Connection::connect(conn_string, TlsMode::None)?;
 
     let guild_id = format!("{}", guild_id);
@@ -51,12 +51,12 @@ pub fn get_message_statistics(msg: &Message) -> Result<String, CommandError> {
     // Don't reply to PM's as the command is only valid for guilds.
     let guild = match msg.guild() {
         Some(guild) => guild,
-        None => return Err(CommandError::Generic("No statistics in PMs.".to_owned())),
+        None => return Ok("Can't use statistics in PMs.".to_owned()),
     };
     let guild = guild.read();
     let guild_id = format!("{}", guild.id.0);
 
-    let conn_string = env::var("POSTGRES_CONNSTRING").expect("Expected a token in the environment");
+    let conn_string = env::var("POSTGRES_CONNSTRING")?;
     let conn = Connection::connect(conn_string, TlsMode::None)?;
     let rows = &conn.query(
         "SELECT user_id, SUM(messages) as messages, SUM(words) as words FROM statistics
@@ -73,7 +73,7 @@ fetch first 10 rows only",
         let user_id = match u64::from_str(&user_id) {
             Ok(id) => id,
             Err(_) => {
-                println!("Failed to parse id {} to int.", user_id);
+                error!("Failed to parse id {} to int.", user_id);
                 continue;
             }
         };
@@ -81,7 +81,7 @@ fetch first 10 rows only",
         let user = match guild.member(user_id) {
             Ok(user) => user,
             Err(_) => {
-                println!("Failed to look up member from id {}.", user_id);
+                error!("Failed to look up member from id {}.", user_id);
                 continue;
             }
         };

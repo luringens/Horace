@@ -1,6 +1,7 @@
 use serenity::prelude::SerenityError;
 use postgres;
 
+use std::env::VarError;
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result};
 
@@ -8,6 +9,7 @@ use std::fmt::{Display, Formatter, Result};
 pub enum CommandError {
     Serenity(SerenityError),
     Postgres(postgres::Error),
+    Env(VarError),
     Generic(String),
 }
 
@@ -23,6 +25,12 @@ impl From<postgres::Error> for CommandError {
     }
 }
 
+impl From<VarError> for CommandError {
+    fn from(err: VarError) -> CommandError {
+        CommandError::Env(err)
+    }
+}
+
 impl From<String> for CommandError {
     fn from(err: String) -> CommandError {
         CommandError::Generic(err)
@@ -34,6 +42,7 @@ impl Display for CommandError {
         match *self {
             CommandError::Serenity(ref err) => write!(f, "{}", err),
             CommandError::Postgres(ref err) => write!(f, "{}", err),
+            CommandError::Env(ref err) => write!(f, "{}", err),
             CommandError::Generic(ref err) => write!(f, "{}", err),
         }
     }
@@ -44,6 +53,7 @@ impl Error for CommandError {
         match *self {
             CommandError::Serenity(ref err) => err.description(),
             CommandError::Postgres(ref err) => err.description(),
+            CommandError::Env(ref err) => err.description(),
             CommandError::Generic(ref str) => &str,
         }
     }
