@@ -9,6 +9,7 @@ use remindme::*;
 use roles::*;
 use statistics::*;
 use command_error::CommandError;
+use connectionpool::ConnectionPool;
 
 pub struct Handler;
 
@@ -22,8 +23,11 @@ static HELP_TEXT: &str = "Usage:
 x minutes/hours/days/weeks.";
 
 impl EventHandler for Handler {
-    fn message(&self, _: Context, msg: Message) {
-        if let Err(e) = save_message_statistic(&msg) {
+    fn message(&self, ctx: Context, msg: Message) {
+        let mut data = ctx.data.lock();
+        let cmd = data.get_mut::<ConnectionPool>().unwrap();
+
+        if let Err(e) = save_message_statistic(&msg, &mut cmd) {
             warn!("An error occurred while saving stats: {}", e.description());
         }
 
@@ -46,10 +50,10 @@ impl EventHandler for Handler {
                 reply_or_print_result(&msg, roles(&msg));
             }
             "!stats" => {
-                reply_or_print_result(&msg, get_message_statistics(&msg));
+                reply_or_print_result(&msg, get_message_statistics(&msg, &mut cmd));
             }
             "!remindme" => {
-                reply_or_print_result(&msg, remindme(&msg));
+                reply_or_print_result(&msg, remindme(&msg, &mut cmd));
             }
             _ => {}
         }

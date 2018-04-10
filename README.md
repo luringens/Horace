@@ -20,8 +20,7 @@ Made using the [Serenity](https://crates.io/crates/serenity) library.
 
 ## How to run
 
-First, set `DISCORD_TOKEN` and `POSTGRES_CONNSTRING` in your environment.
-If the latter is ommitted, horace will run while complain constantly. Then:
+First, set `DISCORD_TOKEN` and `POSTGRES_CONNSTRING` in your environment. Then:
 
 ```sh
 `cargo run --release`.

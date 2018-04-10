@@ -1,5 +1,6 @@
 use serenity::prelude::SerenityError;
 use postgres;
+use r2d2;
 
 use std::env::VarError;
 use std::error::Error;
@@ -10,6 +11,7 @@ pub enum CommandError {
     Serenity(SerenityError),
     Postgres(postgres::Error),
     Env(VarError),
+    R2d2(r2d2::Error),
     Generic(String),
 }
 
@@ -31,6 +33,12 @@ impl From<VarError> for CommandError {
     }
 }
 
+impl From<r2d2::Error> for CommandError {
+    fn from(err: r2d2::Error) -> CommandError {
+        CommandError::R2d2(err)
+    }
+}
+
 impl From<String> for CommandError {
     fn from(err: String) -> CommandError {
         CommandError::Generic(err)
@@ -43,6 +51,7 @@ impl Display for CommandError {
             CommandError::Serenity(ref err) => write!(f, "{}", err),
             CommandError::Postgres(ref err) => write!(f, "{}", err),
             CommandError::Env(ref err) => write!(f, "{}", err),
+            CommandError::R2d2(ref err) => write!(f, "{}", err),
             CommandError::Generic(ref err) => write!(f, "{}", err),
         }
     }
@@ -54,6 +63,7 @@ impl Error for CommandError {
             CommandError::Serenity(ref err) => err.description(),
             CommandError::Postgres(ref err) => err.description(),
             CommandError::Env(ref err) => err.description(),
+            CommandError::R2d2(ref err) => err.description(),
             CommandError::Generic(ref str) => &str,
         }
     }

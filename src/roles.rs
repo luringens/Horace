@@ -28,15 +28,8 @@ fn get_public_roles(guild: &Guild) -> Vec<&Role> {
 /// Takes a `!role ...` command or similar and tries to toggle the authors
 /// membership in that role. Only assigns roles from
 /// [get_public_roles](get_public_roles).
-pub fn role(msg: &Message) -> Result<String, CommandError> {
-    let rolename: String = msg.content
-        .chars()
-        .skip_while(|c| !c.is_whitespace())
-        .skip(1)
-        .collect::<String>()
-        .to_lowercase();
-
-    if rolename.is_empty() {
+pub fn toggle_role(role_name: &str, msg: &Message) -> Result<String, CommandError> {
+    if role_name.is_empty() {
         return Ok("Please enter a role name.".to_owned());
     }
 
@@ -48,7 +41,7 @@ pub fn role(msg: &Message) -> Result<String, CommandError> {
 
     let role = get_public_roles(&guildwritelock)
         .into_iter()
-        .find(|r| r.name.to_lowercase() == rolename);
+        .find(|r| r.name.to_lowercase() == role_name);
     let role = match role {
         Some(r) => r,
         None => return Ok("Could not find role.".to_owned()),
@@ -56,7 +49,7 @@ pub fn role(msg: &Message) -> Result<String, CommandError> {
 
     let mut member = msg.member()
         .ok_or(format!("Could not get member from user {}", msg.author.id))?;
-    
+
     if msg.author.has_role(guildwritelock.id, role) {
         member.remove_role(role)?;
         Ok("Role removed!".to_owned())
