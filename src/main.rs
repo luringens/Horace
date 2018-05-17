@@ -2,40 +2,72 @@ extern crate chrono;
 extern crate env_logger;
 #[macro_use]
 extern crate log;
-extern crate postgres;
 extern crate r2d2;
 extern crate r2d2_postgres;
 #[macro_use]
 extern crate serenity;
 extern crate typemap;
+#[macro_use]
+extern crate diesel;
+extern crate dotenv;
 
-mod command_error;
-mod roles;
-mod statistics;
-mod remindme;
-mod connectionpool;
+mod schema;
+mod models;
+//mod command_error;
+//mod roles;
+//mod statistics;
+//mod remindme;
+//mod connectionpool;
 
 use std::{env, thread};
 use serenity::prelude::*;
 use serenity::model::{Permissions, gateway::Ready, id::ChannelId};
-use serenity::framework::standard::{help_commands, Args, DispatchError, HelpBehaviour,
-                                    StandardFramework};
+use serenity::framework::standard::{help_commands, Args, DispatchError, HelpBehaviour, StandardFramework};
+use diesel::prelude::*;
+use diesel::pg::PgConnection;
+use dotenv::dotenv;
+use diesel::prelude::*;
+use models::*;
+use diesel::deserialize::FromSql;
+use chrono::Date;
+//use statistics::*;
+//use command_error::CommandError;
+//use remindme::watch_for_reminders;
+//use connectionpool::ConnectionPool;
 
-use statistics::*;
-use command_error::CommandError;
-use remindme::watch_for_reminders;
-use connectionpool::ConnectionPool;
-
-struct Handler;
+/*struct Handler;
 
 impl EventHandler for Handler {
     fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
     }
+}*/
+
+pub fn establish_connection() -> PgConnection {
+    dotenv().ok();
+
+    let database_url = env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set");
+    PgConnection::establish(&database_url)
+        .expect(&format!("Error connecting to {}", database_url))
 }
 
 fn main() {
+    use schema::statistics::dsl::*;
+
+    let connection = establish_connection();
+    let results = statistics.load::<Statistic>(&connection)
+        .expect("Error loading stats");
+
+    println!("Displaying {} stats", results.len());
+    for post in results {
+        println!("{}", post.messages);
+        println!("{}", post.words);
+    }
+    return;
+
     // Configure the Discord client with the bot token in the environment.
+    /*
     let token = env::var("DISCORD_TOKEN").expect("Expected a Discord token in the environment");
     let mut client = Client::new(&token, Handler).expect("Error creating the Discord client");
     {
@@ -120,9 +152,9 @@ fn main() {
     // Start a single shard and start listening to events.
     if let Err(why) = client.start() {
         error!("Client error: {:?}", why);
-    }
+    }*/
 }
-
+/*
 command!(about(_ctx, msg, _args) {
     const ABOUT: &str = "A small bot made for the RPS community :)\n\
                          Source code at https://github.com/stisol/Horace";
@@ -190,3 +222,4 @@ fn reply_or_log_error(result: Result<String, CommandError>, channel_id: &Channel
         error!("Couldn't do !roles: {:?}", why);
     };
 }
+*/
