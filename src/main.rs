@@ -123,9 +123,13 @@ fn main() {
                     .guild_only(true)
                     .required_permissions(Permissions::ADMINISTRATOR)
                     .cmd(statistics::stats)
-            }), /*.command("ping", |c| c
-            .check(owner_check)
-            .cmd(ping))*/
+            })
+            .command("purge", |c| {
+                c.desc("Purge a number of messages from a channel.")
+                    .guild_only(true)
+                    .required_permissions(Permissions::MANAGE_MESSAGES)
+                    .cmd(admin::purge)
+            }),
     );
 
     // Start a single shard and start listening to events.
