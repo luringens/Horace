@@ -1,6 +1,6 @@
-use serenity::prelude::SerenityError;
 use postgres;
 use r2d2;
+use serenity::prelude::SerenityError;
 
 use std::env::VarError;
 use std::error::Error;

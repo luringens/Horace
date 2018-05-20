@@ -10,20 +10,16 @@ extern crate serenity;
 extern crate typemap;
 
 mod command_error;
-mod roles;
-mod statistics;
-mod remindme;
+mod commands;
 mod connectionpool;
+mod util;
 
-use std::{env, thread};
+use serenity::framework::standard::{help_commands, DispatchError, HelpBehaviour, StandardFramework};
+use serenity::model::{Permissions, gateway::Ready};
 use serenity::prelude::*;
-use serenity::model::{Permissions, gateway::Ready, id::ChannelId};
-use serenity::framework::standard::{help_commands, Args, DispatchError, HelpBehaviour,
-                                    StandardFramework};
+use std::{env, thread};
 
-use statistics::*;
-use command_error::CommandError;
-use remindme::watch_for_reminders;
+use commands::*;
 use connectionpool::ConnectionPool;
 
 struct Handler;
@@ -46,19 +42,29 @@ fn main() {
 
     // Run a background thread to watch for !remindme triggers
     thread::spawn(move || {
-        watch_for_reminders(ConnectionPool::new());
+        remindme::watch_for_reminders(ConnectionPool::new());
     });
 
     client.with_framework(
         StandardFramework::new()
             .configure(|c| c.prefix("?").delimiter(" "))
             .before(|ctx, msg, _command_name| {
-                let mut data = ctx.data.lock();
-                let mut pool = data.get_mut::<ConnectionPool>().unwrap();
+                let mut pool = util::get_pool(ctx);
 
-                if let Err(why) = save_message_statistic(&msg, &mut pool) {
-                    warn!("An error occurred while saving stats: {:?}", why);
-                }
+                // Don't reply to PM's as the command is only valid for guilds.
+                let guild_id = match msg.guild_id() {
+                    Some(id) => id,
+                    None => return false,
+                };
+
+                // Push additional message and word count to db.
+                pool.update_statistics(
+                    guild_id,
+                    msg.author.id,
+                    msg.timestamp.naive_utc().date(),
+                    1,
+                    msg.content.split_whitespace().count() as i32,
+                ).expect("Failed to update statistics");
 
                 true
             })
@@ -97,21 +103,26 @@ fn main() {
             .command("roles", |c| {
                 c.desc("Lists all public roles you can join with `!role`.")
                     .batch_known_as(vec!["ranks", "publicroles"])
+                    .guild_only(true)
                     .bucket("delayed")
-                    .cmd(rolesc)
+                    .cmd(roles::publicroles)
             })
             .command("role", |c| {
                 c.desc("Joins or leaves a public role.")
+                    .guild_only(true)
                     .known_as("rank")
-                    .cmd(role)
+                    .cmd(roles::joinrole)
             })
             .command("remindme", |c| {
-                c.desc("Have the bot remind you of something.").cmd(remind)
+                c.desc("Have the bot remind you of something.")
+                    .guild_only(true)
+                    .cmd(remindme::remind)
             })
             .command("stats", |c| {
                 c.desc("Shows some stats about the most active members.")
+                    .guild_only(true)
                     .required_permissions(Permissions::ADMINISTRATOR)
-                    .cmd(stats)
+                    .cmd(statistics::stats)
             }), /*.command("ping", |c| c
             .check(owner_check)
             .cmd(ping))*/
@@ -144,49 +155,3 @@ command!(help(_ctx, msg, _args) {
         println!("Error sending message: {:?}", why);
     }
 });
-
-command!(rolesc(_ctx, msg, _args) {
-    reply_or_log_error(roles::roles(&msg), &msg.channel_id);
-});
-
-command!(role(_ctx, msg, args) {
-    let role_name = args.full();
-    let result = self::roles::toggle_role(role_name, &msg);
-    reply_or_log_error(result, &msg.channel_id);
-});
-
-command!(stats(ctx, msg, args) {
-    const DEFAULT_DAYS: u32 = 7;
-    let days = args.single::<u32>().unwrap_or(DEFAULT_DAYS);
-    let mut data = ctx.data.lock();
-    let pool = data.get_mut::<ConnectionPool>().expect("Could not get connection pool.");
-    let result = get_message_statistics(days, &msg, pool);
-    reply_or_log_error(result, &msg.channel_id);
-});
-
-command!(remind(ctx, msg, args) {
-    let num = args.single::<u32>().unwrap();
-    let scale = args.single::<String>().unwrap();
-
-    let mut message = String::new();
-    args.multiple::<String>()
-        .unwrap()
-        .into_iter()
-        .for_each(|s| {
-            message.push_str(&s);
-            message.push_str(" ");
-        });
-
-    let mut data = ctx.data.lock();
-    let pool = data.get_mut::<ConnectionPool>().expect("Could not get connection pool.");
-    let result = remindme::remindme(num, &scale, &message, &msg.author.id, pool);
-    reply_or_log_error(result, &msg.channel_id);
-});
-
-fn reply_or_log_error(result: Result<String, CommandError>, channel_id: &ChannelId) {
-    let result = result.and_then(|r| channel_id.say(r).map_err(|e| CommandError::Serenity(e)));
-
-    if let Err(why) = result {
-        error!("Couldn't do !roles: {:?}", why);
-    };
-}

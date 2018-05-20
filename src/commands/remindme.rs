@@ -1,61 +1,56 @@
 use std::str::FromStr;
 use std::{thread, time};
 
-use serenity::model::channel::Message;
-use serenity::model::id::UserId;
 use chrono::Duration;
 use chrono::offset::Utc;
+use serenity::model::id::UserId;
 
-use command_error::*;
+use command_error::CommandError;
 use connectionpool::ConnectionPool;
+use util;
 
 static USAGE: &str = "Usage: `!remindme x scale`, where `x` is a number, \
                       and scale is `minutes`, `hours`, `days` or `weeks`.";
 
-/// Stores a reminder in the database.
-pub fn remindme(
-    num: u32,
-    scale: &str,
-    message: &str,
-    user_id: &UserId,
-    pool: &mut ConnectionPool,
-) -> Result<String, CommandError> {
-    let user_id = format!("{}", user_id.0);
+command!(remind(ctx, msg, args) {
+    let num = args.single::<i64>().unwrap();
+    let scale = args.single::<String>().unwrap();
 
-    let interval = match interval(num as i64, &scale) {
-        Ok(i) => i,
-        Err(why) => return Ok(why),
+    let mut message = String::new();
+    args.multiple::<String>()
+        .unwrap()
+        .into_iter()
+        .for_each(|s| {
+            message.push_str(&s);
+            message.push_str(" ");
+        });
+
+    let interval = match &*scale.to_lowercase() {
+        "minutes" | "minute" => Duration::minutes(num),
+        "hours" | "hour" => Duration::hours(num),
+        "days" | "day" => Duration::days(num),
+        "weeks" | "week" => Duration::weeks(num),
+        _ => {
+            util::print_or_log_error(&format!("Invalid duration scale.\n{}", USAGE), &msg.channel_id);
+            return Ok(());
+        }
     };
 
-    let date = Utc::now()
-        .naive_utc()
-        .checked_add_signed(interval)
-        .ok_or(CommandError::Generic("Date overflow".to_owned()))?;
+    let date = match Utc::now().naive_utc().checked_add_signed(interval) {
+        Some(v) => v,
+        None => {
+            util::print_or_log_error("Invalid date (overflow)", &msg.channel_id);
+            return Ok(());
+        }
+    };
 
-    // And ship it all to the database.
-    let conn = pool.get_conn()?;
-    conn.execute(
-        "INSERT INTO reminders (user_id, date, message) VALUES ($1, $2, $3)",
-        &[&user_id, &date, &message],
-    )?;
+    util::get_pool(ctx).add_reminder(&msg.author.id, date, &message)?;
 
-    Ok(format!(
+    util::print_or_log_error(&format!(
         "Reminder set for {} UTC.",
-        date.format("%Y-%m-%d %H:%M:%S")
-    ))
-}
-
-/// Attempts to parse the interval part from a `!remindme` command.
-/// Currently only supports a `x minutes/hours/days/weeks` syntax.
-fn interval(num: i64, scale: &str) -> Result<Duration, String> {
-    match &*scale.to_lowercase() {
-        "minutes" | "minute" => return Ok(Duration::minutes(num)),
-        "hours" | "hour" => return Ok(Duration::hours(num)),
-        "days" | "day" => return Ok(Duration::days(num)),
-        "weeks" | "week" => return Ok(Duration::weeks(num)),
-        _ => return Err(format!("Invalid duration scale.\n{}", USAGE)),
-    }
-}
+        date.format("%Y-%m-%d %H:%M")
+    ), &msg.channel_id);    
+});
 
 /// Infinite loop that checks the database periodically for expired reminders.
 pub fn watch_for_reminders(mut pool: ConnectionPool) -> ! {
@@ -81,7 +76,7 @@ pub fn watch_for_reminders(mut pool: ConnectionPool) -> ! {
 }
 
 fn get_expired_reminders(pool: &mut ConnectionPool) -> Result<Vec<Reminder>, CommandError> {
-    let conn = pool.get_conn()?;
+    let conn = pool.get_conn();
     let rows = conn.query(
         "SELECT id, user_id, message FROM reminders WHERE date < current_timestamp",
         &[],
