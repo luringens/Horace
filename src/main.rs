@@ -5,6 +5,7 @@ extern crate log;
 extern crate postgres;
 extern crate r2d2;
 extern crate r2d2_postgres;
+extern crate rand;
 #[macro_use]
 extern crate serenity;
 extern crate typemap;
@@ -49,22 +50,22 @@ fn main() {
         StandardFramework::new()
             .configure(|c| c.prefix("?").delimiter(" "))
             .before(|ctx, msg, _command_name| {
-                let mut pool = util::get_pool(ctx);
-
-                // Don't reply to PM's as the command is only valid for guilds.
+                // Don't log statistics for PM's
                 let guild_id = match msg.guild_id() {
                     Some(id) => id,
                     None => return false,
                 };
 
                 // Push additional message and word count to db.
-                pool.update_statistics(
-                    guild_id,
-                    msg.author.id,
-                    msg.timestamp.naive_utc().date(),
-                    1,
-                    msg.content.split_whitespace().count() as i32,
-                ).expect("Failed to update statistics");
+                util::get_pool(ctx)
+                    .update_statistics(
+                        guild_id,
+                        msg.author.id,
+                        msg.timestamp.naive_utc().date(),
+                        1,
+                        msg.content.split_whitespace().count() as i32,
+                    )
+                    .expect("Failed to update statistics");
 
                 true
             })

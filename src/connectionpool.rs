@@ -15,6 +15,20 @@ pub struct ConnectionPool {
 }
 
 impl ConnectionPool {
+    pub fn new() -> ConnectionPool {
+        let connstring = env::var("POSTGRES_CONNSTRING")
+            .expect("Expected a PostgreSQL connection string in the environment");
+        let manager = PostgresConnectionManager::new(connstring, TlsMode::None)
+            .expect("Failed to set up Postgres connection manager.");
+        let pool = Pool::new(manager).expect("Failed to set up R2D2 connection pool.");
+
+        ConnectionPool { pool }
+    }
+
+    pub fn get_conn(&mut self) -> PooledConnection<PostgresConnectionManager> {
+        self.pool.get().expect("Failed to get postgres connection.")
+    }
+
     pub fn update_statistics(
         &mut self,
         guild_id: GuildId,
@@ -136,22 +150,6 @@ impl Default for ConnectionPool {
 
 impl Key for ConnectionPool {
     type Value = ConnectionPool;
-}
-
-impl ConnectionPool {
-    pub fn new() -> ConnectionPool {
-        let connstring = env::var("POSTGRES_CONNSTRING")
-            .expect("Expected a PostgreSQL connection string in the environment");
-        let manager = PostgresConnectionManager::new(connstring, TlsMode::None)
-            .expect("Failed to set up Postgres connection manager.");
-        let pool = Pool::new(manager).expect("Failed to set up R2D2 connection pool.");
-
-        ConnectionPool { pool }
-    }
-
-    pub fn get_conn(&mut self) -> PooledConnection<PostgresConnectionManager> {
-        self.pool.get().expect("Failed to get postgres connection.")
-    }
 }
 
 #[derive(Debug)]

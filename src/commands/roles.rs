@@ -16,7 +16,7 @@ command!(publicroles(_ctx, msg, _args) {
         print_or_log_error("No public roles.", &msg.channel_id);
         return Ok(());
     }
-    
+
     // Split into two columns, alternating between the two.
     let mut col1 = Vec::with_capacity(roles.len() / 2);
     let mut col2 = Vec::with_capacity(roles.len() / 2);

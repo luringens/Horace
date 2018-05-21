@@ -5,7 +5,7 @@ use command_error::CommandError;
 command!(purge(_ctx, msg, args) {
     // Get the number of messages to delete.
     let num = args.single::<u64>().unwrap();
-    
+
     let channel = msg.channel()
         .ok_or(CommandError::Generic("Could not get channel.".to_owned()))?;
     let channel = channel.guild()
@@ -16,6 +16,6 @@ command!(purge(_ctx, msg, args) {
                                           .into_iter()
                                           .map(|m| m.id)
                                           .collect();
-    
+
     channel.delete_messages(messages.into_iter())?;
 });
