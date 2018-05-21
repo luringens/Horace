@@ -5,10 +5,10 @@ use chrono::Duration;
 use chrono::offset::Utc;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use serenity::model::id::UserId;
+use serenity::model::id::{UserId, GuildId};
 use std::iter;
 
-use connectionpool::ConnectionPool;
+use connectionpool::*;
 use util;
 
 static USAGE: &str = "Usage: `!remindme x scale`, where `x` is a number, \
@@ -52,10 +52,10 @@ command!(remind(ctx, msg, args) {
             .take(32)
             .collect();
 
-    util::get_pool(ctx).add_reminder(&msg.author.id, date, &message, &bookmark)?;
+    util::get_pool(ctx).add_reminder(&msg.author.id, &msg.guild_id(), date, &message, &bookmark)?;
 
     util::print_or_log_error(&format!(
-        "Reminder set for {} UTC.\nBookmark: {}",
+        "Reminder set for {} UTC.\nBookmark: `{}`",
         date.format("%Y-%m-%d %H:%M"),
         bookmark
     ), &msg.channel_id);
@@ -85,7 +85,7 @@ pub fn watch_for_reminders(mut pool: ConnectionPool) -> ! {
 
         // Send all reminders.
         for reminder in reminders.into_iter() {
-            if let Err(why) = dm_with_message(reminder.user_id, reminder.message) {
+            if let Err(why) = dm_with_message(reminder) {
                 error!("Error while DM'ing: {}", why);
             }
         }
@@ -93,23 +93,29 @@ pub fn watch_for_reminders(mut pool: ConnectionPool) -> ! {
 }
 
 /// Parses a user_id and sends a reminder to the user.
-fn dm_with_message(user_id: String, message: String) -> Result<(), String> {
-    let userid = UserId::from_str(&user_id).map_err(|e| format!("Failed to get user id: {}", e))?;
+fn dm_with_message(reminder: Reminder) -> Result<(), String> {
+    let userid = UserId::from_str(&reminder.user_id).map_err(|e| format!("Failed to get user id: {}", e))?;
 
     let user = userid
         .get()
         .map_err(|e| format!("Failed to get user: {}", e))?;
 
-    let response = if message.is_empty() {
-        "Hello! You asked me to remind you of something at this time,\n\
-         but you didn't specify what!"
-            .to_owned()
-    } else {
-        format!(
-            "Hello! You asked me to remind you of the following: {}",
-            message
-        )
+    let mut response = match reminder.message {
+        None => "Hello! You asked me to remind you of something at this time,\
+         but you didn't specify what!".to_owned(),
+        Some(m) => format!("Hello! You asked me to remind you of the following:\n{}", m)
     };
+
+    response.push_str(&format!("\nYou can find the place you issued the command\
+                              by searching for `{}`", reminder.bookmark));
+
+    if let Some(server_id) = reminder.server_id {
+        let servername = u64::from_str(&server_id)
+            .and_then(|u| Ok(GuildId::from(u)))
+            .map_err(|e| format!("Failed to get user id: {}", e))?;
+
+        response.push_str(&format!(" in {}", servername));
+    }
 
     user.direct_message(|m| m.content(&response))
         .map_err(|why| format!("Failed to DM user: {}", why))?;

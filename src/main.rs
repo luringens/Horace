@@ -116,7 +116,6 @@ fn main() {
             })
             .command("remindme", |c| {
                 c.desc("Have the bot remind you of something.")
-                    .guild_only(true)
                     .cmd(remindme::remind)
             })
             .command("stats", |c| {
