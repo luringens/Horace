@@ -93,12 +93,37 @@ impl ConnectionPool {
         user_id: &UserId,
         date: NaiveDateTime,
         message: &str,
+        bookmark: &str,
     ) -> Result<(), CommandError> {
         self.get_conn().execute(
-            "INSERT INTO reminders (user_id, date, message) VALUES ($1, $2, $3)",
-            &[&format!("{}", user_id.0), &date, &message],
+            "INSERT INTO reminders (user_id, date, message, bookmark) VALUES ($1, $2, $3, $4)",
+            &[&format!("{}", user_id.0), &date, &message, &bookmark],
         )?;
 
+        Ok(())
+    }
+
+    pub fn get_expired_reminders(&mut self) -> Result<Vec<Reminder>, CommandError> {
+        let rows = self.get_conn().query(
+            "SELECT id, user_id, message FROM reminders WHERE date < current_timestamp",
+            &[],
+        )?;
+
+        let result: Vec<Reminder> = rows.into_iter()
+            .map(|row| Reminder {
+                id: row.get(0),
+                user_id: row.get(1),
+                message: row.get(2),
+                bookmark: row.get(3),
+            })
+            .collect();
+
+        Ok(result)
+    }
+
+    pub fn delete_reminder(&mut self, id: i32) -> Result<(), CommandError> {
+        self.get_conn()
+            .execute("DELETE FROM reminders WHERE id = $1", &[&id])?;
         Ok(())
     }
 }
@@ -134,4 +159,12 @@ pub struct Statistics {
     pub user_id: guild::Member,
     pub messages: i64,
     pub words: i64,
+}
+
+#[derive(Debug)]
+pub struct Reminder {
+    pub id: i32,
+    pub user_id: String,
+    pub message: String,
+    pub bookmark: String,
 }
