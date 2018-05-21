@@ -119,7 +119,7 @@ impl ConnectionPool {
 
     pub fn get_expired_reminders(&mut self) -> Result<Vec<Reminder>, CommandError> {
         let rows = self.get_conn().query(
-            "SELECT id, user_id, message FROM reminders WHERE date < current_timestamp",
+            "SELECT id, user_id, message, bookmark FROM reminders WHERE date < current_timestamp",
             &[],
         )?;
 

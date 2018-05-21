@@ -1,31 +1,24 @@
-use serenity::model::channel::Message;
+use serenity::framework::standard::CommandError;
 
-use command_error::CommandError;
-use connectionpool::ConnectionPool;
 use util;
-
-command!(stats(ctx, msg, args) {
-    let days = args.single::<u32>().unwrap_or(7);
-    let mut pool = util::get_pool(ctx);
-    let result = get_message_statistics(days, &msg, &mut pool)
-        .and_then(|r| msg.channel_id.say(r).map_err(|e| CommandError::Serenity(e)));
-    if let Err(why) = result {
-        error!("Couldn't do !roles: {:?}", why);
-    };
-});
 
 /// Get the top ten most active users by word count.
 /// Default number of days of activity to look at is 7.
-pub fn get_message_statistics(
-    days: u32,
-    msg: &Message,
-    pool: &mut ConnectionPool,
-) -> Result<String, CommandError> {
+command!(stats(ctx, msg, args) {
+    let days = args.single::<u32>().unwrap_or(7);
+    let mut pool = util::get_pool(ctx);
+    
     let guild = msg.guild().unwrap();
     let guild = guild.read();
 
     // Get the stats.
-    let statistics = pool.get_statistics(guild.id, days)?;
+    let statistics = match pool.get_statistics(guild.id, days) {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to get statistics: {}", e);
+            return Err(CommandError("Database connection error.".to_owned()));
+        }
+    };
 
     // Pretty print.
     let name_width = statistics
@@ -59,9 +52,9 @@ pub fn get_message_statistics(
         })
         .fold(String::new(), |a, b| format!("{}\n{}", a, b));
 
-    Ok(format!(
+    util::print_or_log_error(&format!(
         "Statistics for the top 10 most active users the last {} days:\
          \n```\n{}\n```",
         days, result
-    ))
-}
+    ), &msg.channel_id);
+});
